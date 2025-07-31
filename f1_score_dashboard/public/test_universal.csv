@@ -1,0 +1,13 @@
+ID,Tolid,Tool,F1-score,Precision,Recall,Accuracy
+DS-001,test1,FCS+TIARA,0.750,0.800,0.706,0.900
+DS-001,test1,CustomTool_v1,0.820,0.850,0.792,0.915
+DS-001,test1,AnotherTool,0.650,0.600,0.705,0.885
+DS-001,test1,ML_Classifier_v2,0.780,0.820,0.742,0.910
+DS-002,test2,FCS+TIARA,0.680,0.720,0.643,0.870
+DS-002,test2,CustomTool_v1,0.720,0.760,0.683,0.890
+DS-002,test2,AnotherTool,0.590,0.550,0.633,0.850
+DS-002,test2,ML_Classifier_v2,0.710,0.740,0.681,0.885
+DS-003,test3,FCS+TIARA,0.800,0.850,0.754,0.920
+DS-003,test3,CustomTool_v1,0.830,0.880,0.783,0.935
+DS-003,test3,AnotherTool,0.720,0.680,0.764,0.905
+DS-003,test3,ML_Classifier_v2,0.810,0.860,0.764,0.925

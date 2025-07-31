@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test CSV Data</title>
+</head>
+<body>
+    <h1>Test CSV Data Loading</h1>
+    <div id="result"></div>
+    
+    <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+    <script>
+        fetch('/f1_results.csv')
+            .then(response => response.text())
+            .then(csvText => {
+                console.log('CSV text loaded:', csvText.slice(0, 500));
+                
+                const parsed = Papa.parse(csvText, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    transformHeader: (header) => header.trim()
+                });
+                
+                console.log('Parsed data:', parsed.data.slice(0, 5));
+                
+                const cleaned = parsed.data.map(row => {
+                    const cleanedRow = {};
+                    Object.keys(row).forEach(key => {
+                        const cleanKey = key.trim();
+                        let value = row[key];
+                        
+                        if (['Precision', 'Recall', 'Accuracy', 'F1-score'].includes(cleanKey)) {
+                            value = typeof value === 'string' ? parseFloat(value) : value;
+                        }
+                        
+                        cleanedRow[cleanKey] = value;
+                    });
+                    return cleanedRow;
+                }).filter(row => row.ID && row.Tool);
+                
+                console.log('Cleaned data:', cleaned.slice(0, 5));
+                
+                const fcsRows = cleaned.filter(row => row.Tool === 'fcs+tiara');
+                const sourmashRows = cleaned.filter(row => row.Tool !== 'fcs+tiara');
+                
+                document.getElementById('result').innerHTML = `
+                    <p>Total rows: ${cleaned.length}</p>
+                    <p>FCS+TIARA rows: ${fcsRows.length}</p>
+                    <p>Sourmash rows: ${sourmashRows.length}</p>
+                    <p>Sample FCS F1-score: ${fcsRows[0]?.['F1-score']}</p>
+                    <p>Sample Sourmash F1-score: ${sourmashRows[0]?.['F1-score']}</p>
+                `;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('result').innerHTML = `Error: ${error.message}`;
+            });
+    </script>
+</body>
+</html>
