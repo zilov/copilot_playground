@@ -15,6 +15,7 @@ import SampleDetailsSection from './SampleDetailsSection';
 const ComparisonDashboard = () => {
   const [selectedMetric, setSelectedMetric] = useState('F1-score');
   const [comparisonType, setComparisonType] = useState('absolute');
+  const [winRateMetric, setWinRateMetric] = useState('F1-score');
 
   // Dataset management
   const {
@@ -157,6 +158,8 @@ const ComparisonDashboard = () => {
             aggregatedResults={aggregatedResults}
             selectedMetric={selectedMetric}
             comparisonType={comparisonType}
+            winRateMetric={winRateMetric}
+            setWinRateMetric={setWinRateMetric}
           />
 
           {/* Summary Statistics */}

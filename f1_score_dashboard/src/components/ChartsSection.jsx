@@ -5,8 +5,21 @@ import { formatToolName, getMetricKey, getMetricValue } from '../utils/formatter
 const ChartsSection = ({ 
   aggregatedResults, 
   selectedMetric, 
-  comparisonType 
+  comparisonType,
+  winRateMetric,
+  setWinRateMetric 
 }) => {
+  // Helper function to get the appropriate win rate field
+  const getWinRateField = (metric) => {
+    switch (metric) {
+      case 'F1-score': return 'f1_win_rate';
+      case 'Precision': return 'precision_win_rate';
+      case 'Recall': return 'recall_win_rate';
+      case 'Accuracy': return 'accuracy_win_rate';
+      default: return 'f1_win_rate';
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Performance Comparison Chart */}
@@ -47,7 +60,22 @@ const ChartsSection = ({
 
       {/* Win/Loss Summary */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Win Rate vs Baseline (F1-score)</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold">Win Rate vs Baseline</h2>
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium">Metric:</label>
+            <select 
+              value={winRateMetric || selectedMetric} 
+              onChange={(e) => setWinRateMetric && setWinRateMetric(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-sm"
+            >
+              <option value="F1-score">F1-score</option>
+              <option value="Precision">Precision</option>
+              <option value="Recall">Recall</option>
+              <option value="Accuracy">Accuracy</option>
+            </select>
+          </div>
+        </div>
         <ResponsiveContainer width="100%" height={400}>
           <BarChart data={aggregatedResults} margin={{ top: 20, right: 30, left: 20, bottom: 80 }}>
             <CartesianGrid strokeDasharray="3 3" />
@@ -66,11 +94,11 @@ const ChartsSection = ({
             <Tooltip 
               labelFormatter={(label) => formatToolName(label)}
               formatter={(value, name) => [
-                name === 'win_rate' ? `${(value * 100).toFixed(1)}%` : value,
-                name === 'win_rate' ? 'Win Rate' : name
+                `${(value * 100).toFixed(1)}%`,
+                `${winRateMetric || selectedMetric} Win Rate`
               ]}
             />
-            <Bar dataKey="win_rate" fill="#22c55e" />
+            <Bar dataKey={getWinRateField(winRateMetric || selectedMetric)} fill="#22c55e" />
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -75,12 +75,35 @@ export const useDataProcessing = (data) => {
         avg_tool_recall: _.mean(comparisons.map(c => c.tool_recall)),
         avg_tool_accuracy: _.mean(comparisons.map(c => c.tool_accuracy)),
         avg_fcs_f1: _.mean(comparisons.map(c => c.fcs_f1)),
+        // F1 wins/losses
+        f1_wins: comparisons.filter(c => c.f1_diff > 0).length,
+        f1_losses: comparisons.filter(c => c.f1_diff < 0).length,
+        f1_ties: comparisons.filter(c => Math.abs(c.f1_diff) < 0.001).length,
+        // Precision wins/losses
+        precision_wins: comparisons.filter(c => c.precision_diff > 0).length,
+        precision_losses: comparisons.filter(c => c.precision_diff < 0).length,
+        precision_ties: comparisons.filter(c => Math.abs(c.precision_diff) < 0.001).length,
+        // Recall wins/losses
+        recall_wins: comparisons.filter(c => c.recall_diff > 0).length,
+        recall_losses: comparisons.filter(c => c.recall_diff < 0).length,
+        recall_ties: comparisons.filter(c => Math.abs(c.recall_diff) < 0.001).length,
+        // Accuracy wins/losses
+        accuracy_wins: comparisons.filter(c => c.accuracy_diff > 0).length,
+        accuracy_losses: comparisons.filter(c => c.accuracy_diff < 0).length,
+        accuracy_ties: comparisons.filter(c => Math.abs(c.accuracy_diff) < 0.001).length,
+        // Legacy support (for backward compatibility)
         wins: comparisons.filter(c => c.f1_diff > 0).length,
         losses: comparisons.filter(c => c.f1_diff < 0).length,
         ties: comparisons.filter(c => Math.abs(c.f1_diff) < 0.001).length
       };
       
-      stats.win_rate = stats.count > 0 ? stats.wins / stats.count : 0;
+      // Calculate win rates for all metrics
+      stats.f1_win_rate = stats.count > 0 ? stats.f1_wins / stats.count : 0;
+      stats.precision_win_rate = stats.count > 0 ? stats.precision_wins / stats.count : 0;
+      stats.recall_win_rate = stats.count > 0 ? stats.recall_wins / stats.count : 0;
+      stats.accuracy_win_rate = stats.count > 0 ? stats.accuracy_wins / stats.count : 0;
+      // Legacy support
+      stats.win_rate = stats.f1_win_rate;
       
       return stats;
     }).filter(Boolean).sort((a, b) => b.avg_f1_diff - a.avg_f1_diff);
