@@ -97,11 +97,16 @@ export const useDataProcessing = (data) => {
         ties: comparisons.filter(c => Math.abs(c.f1_diff) < 0.001).length
       };
       
-      // Calculate win rates for all metrics
-      stats.f1_win_rate = stats.count > 0 ? stats.f1_wins / stats.count : 0;
-      stats.precision_win_rate = stats.count > 0 ? stats.precision_wins / stats.count : 0;
-      stats.recall_win_rate = stats.count > 0 ? stats.recall_wins / stats.count : 0;
-      stats.accuracy_win_rate = stats.count > 0 ? stats.accuracy_wins / stats.count : 0;
+      // Calculate win rates for all metrics (excluding ties)
+      const f1_decisive = stats.f1_wins + stats.f1_losses;
+      const precision_decisive = stats.precision_wins + stats.precision_losses;
+      const recall_decisive = stats.recall_wins + stats.recall_losses;
+      const accuracy_decisive = stats.accuracy_wins + stats.accuracy_losses;
+      
+      stats.f1_win_rate = f1_decisive > 0 ? stats.f1_wins / f1_decisive : 0;
+      stats.precision_win_rate = precision_decisive > 0 ? stats.precision_wins / precision_decisive : 0;
+      stats.recall_win_rate = recall_decisive > 0 ? stats.recall_wins / recall_decisive : 0;
+      stats.accuracy_win_rate = accuracy_decisive > 0 ? stats.accuracy_wins / accuracy_decisive : 0;
       // Legacy support
       stats.win_rate = stats.f1_win_rate;
       
