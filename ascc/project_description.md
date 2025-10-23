@@ -613,3 +613,47 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 **Следующий шаг:** Задача 1.3 - Обновление nextflow_schema.json
 
 ---
+
+### 2025-10-23 - Задача 1.3: Обновление nextflow_schema.json ✅
+
+**Статус:** Выполнено  
+**Лог:** `~/github/copilot_playground/ascc/log_task_1.3_update_schema.md`
+
+**Измененные файлы:**
+- `/Users/dz11/github/ascc/nextflow_schema.json` - добавлены три новых параметра Sourmash (458 → 514 строк)
+
+**Добавленные параметры:**
+
+1. **`sourmash_databases`** (array):
+   - Структура: массив объектов с полями [name, path, k_available, k_for_search, s, assembly_taxa_db]
+   - Все поля обязательны (required)
+   - Подробный help_text с примером использования
+   - Icon: fas fa-database
+
+2. **`sourmash_db_config`** (string/file-path):
+   - Формат: CSV файл
+   - Pattern: `^\\S+\\.csv$`
+   - Validation: exists = true
+   - Приоритет над sourmash_databases
+   - Icon: fas fa-file-csv
+
+3. **`sourmash_taxonomy_level`** (string/enum):
+   - Default: "order"
+   - Enum: ["class", "family", "order", "genus", "phylum", "species"]
+   - Описание использования для извлечения target taxa
+   - Icon: fas fa-sitemap
+
+**Валидация:**
+- ✅ JSON структура валидна (проверено python3 -m json.tool)
+- ✅ Соответствие nf-core паттернам
+- ✅ Help text с примерами для каждого параметра
+- ✅ Корректные типы данных и validation rules
+
+**Ключевые решения:**
+- Структура параметров полностью соответствует SourmashDatabaseConfig.groovy
+- Зависимости между параметрами документированы в help_text
+- Условная валидация (if run_sourmash enabled) реализована на уровне workflow
+
+**Следующий шаг:** Задача 1.4 - Извлечение target_taxa из taxid
+
+---
