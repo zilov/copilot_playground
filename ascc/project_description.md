@@ -1,414 +1,3 @@
-zilov-martini: улучши промпт для составления плана дальнейшей разработки, ниже мой черновик:
-
-"""check main pipeline, main pipeline parameters and configs and new sourmash subworkflow, understand the stucture of the project.
-new subworkflow was introduced but not setted up properly to integrate in main pipeline, find out what need to be added and how and create a plan to add everything that missed"""
-
-GitHub Copilot: Here's an improved prompt for creating a development plan:
-
-```markdown
-# Development Plan: Sourmash Subworkflow Integration
-
-## Context
-A new Sourmash subworkflow has been created at `subworkflows/local/run_sourmash/main.nf` but is not fully integrated into the main ASCC genomic pipeline.
-
-## Analysis Required
-
-### 1. Code Structure Review
-- Examine the main pipeline architecture in `workflows/ascc_genomic.nf`
-- Understand the pattern used by existing subworkflows (e.g., `GET_KMERS_PROFILE`, `EXTRACT_TIARA_HITS`, `RUN_NT_KRAKEN`)
-- Review how other subworkflows handle:
-  - Input channel preparation
-  - Parameter passing
-  - Output channel mapping
-  - Version tracking
-  - Conditional execution based on `params.run_*` flags
-
-### 2. Sourmash Subworkflow Assessment
-Review `RUN_SOURMASH` subworkflow and identify:
-- Required input channels (currently: genome_fasta, sourmash_database, assembly_taxa_db, target_taxa, k, s)
-- Expected output channels (currently only `versions` is emitted)
-- Missing output emissions (commented out: sourmash_summary, sourmash_non_target)
-- Database requirements and setup
-
-### 3. Integration Gaps Analysis
-Identify missing components:
-- **Parameters**: Check if `params.run_sourmash`, `params.sourmash_*` exist in config
-- **Input preparation**: How to create/format the `ch_dbs` channel
-- **Database paths**: Define sourmash database locations in params
-- **Output handling**: 
-  - Uncomment and map output channels
-  - Add process metadata (similar to `.map { it -> [[id: it[0].id, process: "SOURMASH"], it[1]] }`)
-  - Include in merge operations if needed
-- **Conditional execution**: Add proper run flags like other subworkflows
-
-### 4. Deliverable Plan
-Create a structured implementation plan including:
-- [ ] Required parameter additions to `nextflow.config`
-- [ ] Database setup instructions
-- [ ] Input channel preparation steps
-- [ ] Output channel mapping and metadata formatting
-- [ ] Integration with merge operations (CREATE_BTK_DATASET, ASCC_MERGE_TABLES)
-- [ ] Testing strategy
-- [ ] Documentation updates
-
-## Expected Outcome
-A detailed, step-by-step implementation plan that follows the existing pipeline conventions and enables full Sourmash integration.
-```
-
-This improved prompt:
-- Provides clear context
-- Breaks down analysis into logical sections
-- References specific existing patterns to follow
-- Identifies concrete gaps to address
-- Requests a structured, actionable deliverable
-
-zilov-martini: задай мне вопросы для уточния плана чтобы я тебе более подробно все объяснил
-
-GitHub Copilot: # Уточняющие вопросы для детализации плана интеграции Sourmash
-
-## 1. Назначение и приоритет
-- **Какова основная цель интеграции Sourmash?** (таксономическая классификация, поиск контаминации, что-то другое?)
-- **Какой приоритет у этой задачи?** (критично для релиза, экспериментальная функция, опциональная?)
-- **Должен ли Sourmash работать параллельно с другими инструментами** (например, Kraken, BLAST) или заменять какой-то из них?
-
-## 2. Входные данные и базы данных
-
-### Базы данных
-- **Где должны храниться базы данных Sourmash?** (локально, удаленно, как параметр?)
-- **Сколько баз данных предполагается использовать одновременно?** (судя по коду - несколько, это правильно?)
-- **Какие конкретно базы планируется использовать?** (GTDB? GenBank? RefSeq? custom?)
-- **Как должна передаваться `assembly_taxa_db`?** (это отдельный файл? часть основной базы?)
-
-### Параметр `target_taxa`
-- **Что такое `target_taxa`?** (целевой организм? список таксонов для фильтрации?)
-- **Как пользователь должен его указывать?** (параметр командной строки? из samplesheet?)
-- **Связан ли он с существующими `taxid` или `scientific_name`?**
-
-### Параметры k и s
-- **Должны ли `k` (ksize) и `s` (scaled) быть глобальными параметрами** или можно использовать значения по умолчанию из модулей?
-- **Нужно ли поддерживать множественные значения k?** (например, k=21,31,51?)
-
-## 3. Выходные данные
-
-### Закомментированные outputs
-```groovy
-// sourmash_summary            = PARSE_SOURMASH.out.summary_csv
-// sourmash_non_target         = PARSE_SOURMASH.out.nontarget_csv
-```
-- **Почему эти выходы закомментированы?** (не готовы? временно? не нужны в pipeline?)
-- **Должны ли они интегрироваться в:**
-  - `CREATE_BTK_DATASET`?
-  - `ASCC_MERGE_TABLES`?
-  - Оба?
-  - Свой отдельный отчет?
-
-### Формат данных
-- **В каком формате должны быть `summary_csv` и `nontarget_csv`?** (похожи на другие outputs типа `ch_tiara`, `ch_kraken`?)
-- **Нужно ли добавлять метаданные процесса** (`.map { it -> [[id: it[0].id, process: "SOURMASH"], it[1]] }`)?
-
-## 4. Условия запуска
-
-### Параметры конфигурации
-Посмотрев на паттерн в main workflow:
-```groovy
-if ( params.run_sourmash == "both" || params.run_sourmash == "genomic" )
-```
-- **Должен ли Sourmash поддерживать режимы "genomic"/"transcript"/"both"** как другие инструменты?
-- **Или достаточно простого boolean флага?**
-
-### Зависимости
-- **Зависит ли Sourmash от других шагов pipeline?** (например, должен ли сначала отработать `ESSENTIAL_JOBS`?)
-- **Может ли он запускаться независимо** или нужны результаты других процессов?
-
-## 5. Технические детали
-
-### Текущий код
-```groovy
-ch_dbs = Channel.empty()
-RUN_SOURMASH (
-    sourmash_reference,
-    ch_dbs
-)
-```
-- **Почему `ch_dbs` пустой?** (placeholder? не готово? должно заполняться динамически?)
-- **Откуда должны браться пути к базам данных?** (params? config файл? samplesheet?)
-
-### PARSE_SOURMASH
-- **Модуль `PARSE_SOURMASH` - это ваша разработка** или адаптация существующего?
-- **Он стабилен** или еще в процессе разработки?
-- **Планируется ли его submit в nf-core** или останется в local?
-
-## 6. Тестирование
-- **Есть ли тестовые данные для Sourmash?**
-- **Какой размер типичного входного генома?** (это влияет на resource requirements)
-- **Как долго обычно работает Sourmash на вашем типичном датасете?**
-
-## 7. Документация и стратегия разработки
-- **Хотите сначала доработать в ASCC**, а потом submit в nf-core?
-- **Или сначала довести модули до nf-core стандартов**, а потом интегрировать?
-- **Нужна ли backward compatibility** с предыдущими версиями pipeline?
-
----
-
-**Пожалуйста, ответьте на те вопросы, которые считаете наиболее важными для составления плана. Можно группами или выборочно.**
-
-zilov-martini: 1. поиск контигов-контаминантов в геномных сборках, контаминация определяеться по отсутствию target-taxa kmers в contig. критична, отдельная от кракена и бласта. используется совместно с fcs-gx и tiara, результаты всех тулов комбинируются и выносится решение. пока реализовано только для fcs-gx и tiara, нужно добавить sourmash как третий тул. 
-2. базы данных. как параметр. у нас в проде на сервере, пути будут указаны дефолтные в conf/production.config. для теста база данных на данный момент в папке assets/sourmash_testing/db, потом положу в облако как лежат остальные тестовые базы - эту задачку напиши для меня отдельно в план я ее сделаю. больше 5 баз, но параметрами можно указать и одну. кастомная база, сами делали под эту задачу.  assembly_taxa_db - часть основной базы или нескольких баз сразу. база может быть .zip и .rocksdb, значение k и s у базы уникально. в метаданные процесса можно добавить название базы данных с которой он работает. видимо тут нужен файл который пойдет на вход со списком баз данных например - name, path, k, s, assembly_db что-то такое. если один и тот же путь до assembly_db то его и использовать, если несколько то перед запуском parse_sourmash смерджить с помощью cat. 
-3. target_taxa. таксон целевого организма, доставаться должен через taxid из ncbi taxonomy (он где-то используется в пайплайне наверняка), из интернета или из локальных файлов неважно, вероятно вся база таксономии пайплайном загружается перед запуском но я в этом не уверен. target_taxa из себя предствляет строку, например order:Artiodactyla. если сейчасм пользователь taxid не указывает или он не цепляется атоматически, то нужен параметр. в параметры нужно добавить уровень - один из [class, family, order, genus, phylum]. 
-4. k и s можно для sketch можно указывать в зависимости от значений в базах данных. условно в базах используется k=21,51 и s=200,1000. тогда для sketch параметре k=21,51, s=200. s=1000 можно не указывать так как 200*5=1000, sourmash справится с анализом, у него логика прописана. 
-5. про выходные файлы. забыл раскомментить, в идеале интегрироваться и в btk и в merge_tables где результаты fcs и tiara мерджатся (может быть другое название). минимально и изначально делать для части с fcs и tiara. summary и non-target генерятся скриптом, формат уже утвержден, скрипт в bin/sourmash_taxonomy_parser.py
-6. про запуск. можно both если несложно, но основное использование планируется в genomic. по зависимостям может сразу запускаться, нужен геном и список баз данных.
-7. детали. пока не готово. params или конфиг подробности выше. parse_sourmash - моя разработка для этого проекта. потом может быть в nf-core, пока неактуально.
-8. тестирование. тестовые данные в assets/sourmash_testing. там один геном две базы и один assembly_taxa_db. геномы разные от сотни мегабаз до десятков гигабаз. меньше часа на базу данных. размер баз данных тут (DB	K=31, S=200	K=51, S=200	K=51, S=1000
-Vertebrate	Time: 35 m, RAM: 85 Gb	Time: 45m, RAM: 91 Gb	Time: 16m, RAM: 29 Gb
-Invertebrate	Time: 26m, RAM: 62 Gb	Time: 37m, RAM: 70 Gb	Time: 12m,RAM: 21 Gb
-Plants Fungi Protozoa	Time: 17m, RAM: 39 Gb	Time: 25m,RAM: 49 Gb	Time: 8m,RAM: 18 Gb
-Large genomes	Same as Plants		
-GTDB (Bacteria + Archea)	8Gb Max		
-Viruses (k=21)	1Gb Max		)
-9. мы пока параллельно с nf-core разрабатываем из-за политики компании, пока неактуально. 
-
-GitHub Copilot: Отлично, теперь картина намного яснее! Вот уточняющие вопросы для финализации плана:
-
-## Критические технические вопросы
-
-### 1. Структура конфигурации баз данных
-
-Вы упомянули файл со списком баз. Какой формат предпочтительнее?
-
-**Вариант A: CSV/TSV файл**
-```csv
-name,path,k,s,assembly_taxa_db
-vertebrate_k31_s200,/path/to/vertebrate_k31_s200.zip,31,200,/path/to/assembly_taxa_vertebrate.csv
-vertebrate_k51_s200,/path/to/vertebrate_k51_s200.zip,51,200,/path/to/assembly_taxa_vertebrate.csv
-invertebrate_k31_s200,/path/to/invertebrate_k31_s200.rocksdb,31,200,/path/to/assembly_taxa_invertebrate.csv
-```
-
-**Вариант B: Nextflow config параметры**
-```groovy
-params {
-    sourmash_databases = [
-        [name: 'vertebrate_k31_s200', path: '/path/to/db.zip', k: 31, s: 200, assembly_taxa_db: '/path/to/taxa.csv'],
-        [name: 'vertebrate_k51_s200', path: '/path/to/db.zip', k: 51, s: 200, assembly_taxa_db: '/path/to/taxa.csv']
-    ]
-}
-```
-
-**Вариант C: YAML sidecar**
-```yaml
-databases:
-  - name: vertebrate_k31_s200
-    path: /path/to/vertebrate.zip
-    k: 31
-    s: 200
-    assembly_taxa_db: /path/to/assembly_taxa_vertebrate.csv
-```
-
-**Какой вариант предпочтительнее?** (или другой формат?)
-
----
-
-### 2. Получение target_taxa из taxid
-
-Есть ли в пайплайне уже готовая логика получения таксономической информации из taxid?
-
-**Вопросы:**
-- **Какой модуль/функция сейчас работает с NCBI taxonomy?** (может есть `GET_TAXONOMY` или подобное?)
-- **Где хранятся файлы taxonomy?** (видел `ncbi_taxonomy_path`, `ncbi_ranked_lineage_path` в параметрах main workflow)
-- **Формат target_taxa строго `level:name`?** (например, всегда `order:Artiodactyla`, никогда просто `Artiodactyla`?)
-
-**Предлагаемый параметр:**
-```groovy
-params {
-    sourmash_taxonomy_level = 'order'  // class, family, order, genus, phylum
-    // или автоматически из taxid?
-}
-```
-
-**Нужен ли fallback**, если taxid не указан? (например, skip Sourmash или ошибка?)
-
----
-
-### 3. Интеграция с autofilter
-
-Вы сказали: *"используется совместно с fcs-gx и tiara, результаты всех тулов комбинируются"*
-
-Посмотрев на код:
-```groovy
-AUTOFILTER_AND_CHECK_ASSEMBLY (
-    reference_tuple_from_GG,
-    ch_fcsgx,           // FCS-GX results
-    ch_tiara,           // Tiara results
-    ch_sourmash ???     // <-- сюда нужно добавить?
-)
-```
-
-**Вопросы:**
-- **Модуль `AUTOFILTER_AND_CHECK_ASSEMBLY` уже готов принимать третий input?** (или нужно модифицировать?)
-- **Формат выходных данных Sourmash должен совпадать с форматом Tiara/FCS-GX?** (структура CSV, колонки и т.д.)
-- **Логика комбинирования** - это OR (любой из трех инструментов нашел контаминацию) или AND (все три согласны)?
-
----
-
-### 4. Merge в ASCC_MERGE_TABLES
-
-```groovy
-ASCC_MERGE_TABLES (
-    reference_tuple_from_GG,
-    // ... другие inputs
-    ch_sourmash_summary,     // <-- добавить?
-    ch_sourmash_nontarget    // <-- или оба?
-)
-```
-
-**Вопросы:**
-- **Какой из файлов нужен в merge: `summary_csv`, `nontarget_csv`, или оба?**
-- **Должен ли Sourmash быть обязательным для merge**, или optional (как некоторые другие инструменты)?
-
----
-
-### 5. Обработка множественных баз данных
-
-Сейчас в коде:
-```groovy
-multisearch_input = SOURMASH_SKETCH.out.signatures.combine(sourmash_database)
-```
-
-Это создаст **N jobs** (по одному на каждую базу). Потом результаты объединяются через `CAT_CAT`.
-
-**Вопросы:**
-- **Это правильное поведение?** (N параллельных поисков → объединение результатов)
-- **При мердже нескольких `assembly_taxa_db`** - нужно ли удалять дубликаты? (если одна и та же таксономическая информация в двух базах)
-- **Как должны именоваться промежуточные файлы?** (добавлять имя базы в meta?)
-
-Предлагаемая логика:
-```groovy
-// Добавить имя базы в meta для отслеживания
-multisearch_input = SOURMASH_SKETCH.out.signatures
-    .combine(sourmash_database)
-    .map { meta, sig, db_info -> 
-        [meta + [db_name: db_info.name, k: db_info.k, s: db_info.s], sig, db_info.path]
-    }
-```
-
-**Согласны с таким подходом?**
-
----
-
-### 6. Параметры k и s для SOURMASH_SKETCH
-
-Вы сказали: *"k и s можно для sketch указывать в зависимости от значений в базах данных"*
-
-**Логика:**
-1. Парсим все базы, собираем уникальные k и s
-2. Для sketch используем: `k = unique_k`, `s = min(unique_s)`
-
-**Пример:**
-- База1: k=31, s=200
-- База2: k=51, s=200
-- База3: k=51, s=1000
-
-→ `SOURMASH_SKETCH` запускается с `k=31,51` и `s=200`
-
-**Вопросы:**
-- **Это правильная интерпретация?**
-- **Sketch нужен один для всех баз** или отдельный для каждой комбинации k/s?
-- **Как передавать список k?** (строка `"31,51"` или список `[31, 51]`?)
-
----
-
-### 7. Условия запуска и skip логика
-
-```groovy
-if ( params.run_sourmash == "both" || params.run_sourmash == "genomic" ) {
-    RUN_SOURMASH (...)
-    ch_sourmash_summary = RUN_SOURMASH.out.sourmash_summary
-} else {
-    ch_sourmash_summary = Channel.of( [[],[]] )
-}
-```
-
-**Вопросы:**
-- **Нужна ли проверка наличия баз данных** перед запуском? (как с FCS-GX)
-- **Что делать если `taxid` не указан и не может быть определен?** 
-  - Skip Sourmash?
-  - Выдать warning и продолжить?
-  - Fail pipeline?
-
----
-
-### 8. Приоритетность задач
-
-**Что делаем в первую очередь:**
-
-A. **Минимальная интеграция** (только запуск Sourmash, без autofilter/merge)
-B. **Интеграция с autofilter** (добавление в логику фильтрации)
-C. **Интеграция с merge_tables** (добавление в итоговый отчет)
-D. **Полная интеграция** (все сразу + BTK)
-
-**Какой порядок предпочтительнее?**
-
----
-
-### 9. Тестирование
-
-Для тестового запуска нужно:
-```groovy
-// nextflow.config или test.config
-params {
-    input = 'assets/sourmash_testing/samplesheet.csv'  // <-- есть такой?
-    sourmash_database_config = 'assets/sourmash_testing/databases.csv'
-    taxid = '9903'  // например, для коровы (Bos taurus)
-    sourmash_taxonomy_level = 'order'
-}
-```
-
-**Вопросы:**
-- **Есть ли готовый `samplesheet.csv` в sourmash_testing?**
-- **Какой taxid использовать для теста?** (и какой таксон он должен дать?)
-- **Ожидаемый результат теста** - найти контаминацию или не найти?
-
----
-
-## Дополнительные мелочи
-
-### 10. Naming conventions
-**Как именовать параметры?**
-- `params.sourmash_db_config` или `params.sourmash_databases`?
-- `params.sourmash_taxonomy_level` или `params.target_taxonomy_level`?
-
-### 11. Error handling
-**Что делать при ошибках:**
-- База данных не найдена → fail или skip?
-- `assembly_taxa_db` отсутствует → fail или skip?
-- Все базы дали 0 результатов → warning или fail?
-
----
-
-**Пожалуйста, ответьте на вопросы из блоков 1-9, особенно 1, 2, 3, 5, 6 и 8 - они критичны для составления детального плана!**
-
-zilov-martini: 1. думаю вариант A. B тоже нравится, но боюсь юзеру будет тяжело, если можно и то и другое то давай в production использовать B и возможность указать через параметр табличкой. 
-2. я не уверен, давай отдельную задачку этому посвятим, не успеваю посмотреть. формат да level:taxa_name. параметр ок. смотрю на AUTOFILTER_AND_CHECK_ASSEMBLY и вижу что там вот такие параметры (autofilter.py \\
-        $reference \\
-        --taxid $meta.taxid \\
-        --tiara $tiara_txt \\
-        --fcsgx_sum $fcs_csv \\
-        --out_prefix $prefix \\
-        --ncbi_rankedlineage_path $ncbi_rankedlineage \\
-        ${args} \\), так что все должно быть доступно уже. 
-3. модуль не готов, я думаю там что-то может быть еще перед этим но не точно. получается нужно будет исправить модуль и autofilter.py. формат не совпадает. логику можно посмотреть в скрипте, я не уверен. 
-4. да можно добавить. файл non-target подойдет. можно опционально.
-5. да это правльное поведение, дубликатов быть не должно, если есть то можно ворнинг. да имя базы добавить в meta.
-6. один для всех баз чтобы не генерить много файлов. сейчас передается вот так def args = task.ext.args ?: "dna --param-string 'scaled=1000,k=21,k=31,k=51,abund'". 
-7. да проверить что есть нужно. taxid должен быть скорее всего всегда.
-8. давай для всего задачи кроме btk
-9. все можешь посмотреть в конфиге в assets/sourmash_testing.
-10. params.sourmash_databases, params.sourmash_taxonomy_level
-11. skip и warning для всех.
-
-
-напиши итоговое описание проекта и план без кучи кода для агентов которые будут его выполнять
-
 GitHub Copilot: # Проект: Интеграция Sourmash в ASCC Pipeline
 
 ## Цель проекта
@@ -420,27 +9,65 @@ GitHub Copilot: # Проект: Интеграция Sourmash в ASCC Pipeline
 - **Принцип работы**: Поиск контигов без k-меров целевого таксона (target taxa) указывает на контаминацию
 - **Тестовые данные**: sourmash_testing (геном, 2 базы данных, assembly_taxa_db, конфиг)
 
+
+## Как работаем над прооектом
+- Папка проекта - `~/github/ascc`
+- Логи разработки (описание проекта ,промпты, заметки, результаты) - `~/github/copilot_playground/ascc/`
+- После каждого шага - md файл с логом выполнения в папку лога разработки - используй идентификаторы и имена файлов для удобства поиска и возвращения и в конец описания проекта список изменений с датами и временем и путями до файлов. старые файлы можешь переименовывать и изменять если необходимо.
+- Если есть структурное, архитектурное или идейное изменение проекта - внести изменения в `~/github/copilot_playground/ascc/project_description.md`
+- Если изменения в логах разработки - после каждого шага коммит с описанием. Никогда не коммить сам в папке проекта, это на мне. 
+
+---
+
+---
+
+## Краткое описание решения
+
+**Ключевые принципы:**
+1. Каждая база данных содержит несколько k-меров, но для поиска используется только один оптимальный k
+2. Sketch создается один раз со всеми k, которые будут использоваться во всех базах
+3. Multisearch для каждой базы запускается со своим специфичным k (из `k_for_search`)
+4. Результаты всех баз объединяются и передаются в autofilter для комбинации с FCS-GX и Tiara
+
+**Поток данных:**
+```
+Конфигурация баз → Сбор уникальных k_for_search → 
+SKETCH (k=[21,31,51], s=min) → 
+MULTISEARCH per база (каждая со своим k) → 
+Объединение → PARSE → Autofilter + Merge Tables
+```
+
 ---
 
 ## Архитектура решения
 
 ### 1. Конфигурация баз данных
 
+**Структура конфигурации базы:**
+- `name` - Уникальное имя базы
+- `path` - Путь к .zip или .rocksdb файлу
+- `k_available` - Список всех k-меров в базе (для документации)
+- `k_for_search` - Одно значение k для multisearch (используется в поиске)
+- `s` - Scaled параметр базы
+- `assembly_taxa_db` - Путь к таксономической базе
+
 **Два способа указания баз:**
 
-**A. Через Nextflow config** (для production, production.config):
+**A. Через Nextflow config** (для production, `conf/production.config`):
 ```groovy
 params.sourmash_databases = [
-    [name: 'vertebrate_k31_s200', path: '/prod/path/vertebrate_k31_s200.zip', k: 31, s: 200, assembly_taxa_db: '/prod/path/assembly_taxa_vertebrate.csv'],
-    [name: 'vertebrate_k51_s200', path: '/prod/path/vertebrate_k51_s200.zip', k: 51, s: 200, assembly_taxa_db: '/prod/path/assembly_taxa_vertebrate.csv']
+    [name: 'vertebrate_k51', path: '/prod/vertebrate.zip', k_available: [31, 51], k_for_search: 51, s: 200, assembly_taxa_db: '/prod/assembly_taxa_vertebrate.csv'],
+    [name: 'invertebrate_k31', path: '/prod/invertebrate.zip', k_available: [31, 51], k_for_search: 31, s: 200, assembly_taxa_db: '/prod/assembly_taxa_invertebrate.csv'],
+    [name: 'virus_k21', path: '/prod/virus.zip', k_available: [21, 31], k_for_search: 21, s: 1000, assembly_taxa_db: '/prod/assembly_taxa_virus.csv']
 ]
 ```
 
 **B. Через CSV файл** (для гибкости, параметр `params.sourmash_db_config`):
-```
-name,path,k,s,assembly_taxa_db
-vertebrate_k31_s200,/path/to/db.zip,31,200,/path/to/assembly_taxa.csv
-invertebrate_k31_s200,/path/to/db.rocksdb,31,200,/path/to/assembly_taxa.csv
+```csv
+name,path,k_available,k_for_search,s,assembly_taxa_db
+vertebrate_k51,/prod/vertebrate.zip,"[31,51]",51,200,/prod/assembly_taxa_vertebrate.csv
+invertebrate_k31,/prod/invertebrate.zip,"[31,51]",31,200,/prod/assembly_taxa_invertebrate.csv
+virus_k21,/prod/virus.zip,"[21,31]",21,1000,/prod/assembly_taxa_virus.csv
 ```
 
 **Приоритет**: Если указан `params.sourmash_db_config` → читать CSV, иначе → использовать `params.sourmash_databases`
@@ -462,34 +89,40 @@ params.sourmash_taxonomy_level = 'order'  // class, family, order, genus, phylum
 
 ### 3. Параметры sketch (k и s)
 
-**Логика**:
-1. Собрать уникальные значения `k` из всех баз данных
+**Логика построения sketch:**
+1. Собрать все уникальные значения `k_for_search` из всех баз данных
 2. Взять минимальное значение `s` из всех баз
-3. Сформировать param-string для `SOURMASH_SKETCH`
+3. Сформировать param-string для `SOURMASH_SKETCH` со всеми необходимыми k
 
-**Пример**:
-- База1: k=31, s=200
-- База2: k=51, s=1000
-→ Sketch параметры: `scaled=200,k=31,k=51,abund`
+**Пример:**
+- База1: k_for_search=51, s=200
+- База2: k_for_search=31, s=200
+- База3: k_for_search=21, s=1000
+→ Sketch параметры: `scaled=200,k=21,k=31,k=51,abund`
 
-**Реализация**: Парсинг конфигурации баз → генерация `task.ext.args` через `modules.config`
+**Важно:** Sketch создается ОДИН раз со всеми k, которые будут использоваться в multisearch
+
+**Реализация:** Парсинг конфигурации баз → сбор уникальных `k_for_search` → генерация `task.ext.args` через `modules.config`
 
 ### 4. Обработка множественных баз данных
 
 **Поток данных**:
 ```
-SOURMASH_SKETCH (один sketch для всех баз)
-    ↓
-SOURMASH_MULTISEARCH (N параллельных поисков, по одному на базу)
-    ↓ (добавить имя базы в meta)
-CAT_CAT (объединение результатов)
-    ↓ (проверка на дубликаты assembly_taxa_db)
-MERGE assembly_taxa_db files (если несколько уникальных путей)
-    ↓
-PARSE_SOURMASH (финальная обработка)
+1. Парсинг конфигурации → сбор всех k_for_search
+2. SOURMASH_SKETCH (один sketch со всеми уникальными k)
+3. SOURMASH_MULTISEARCH (N параллельных поисков):
+   - Каждая база использует свой k_for_search
+   - Добавление db_name и k_for_search в meta
+4. CAT_CAT (объединение результатов от всех баз)
+5. Проверка на дубликаты assembly_taxa_db (warning)
+6. MERGE assembly_taxa_db files (если несколько уникальных путей)
+7. PARSE_SOURMASH (финальная обработка)
 ```
 
-**Важно**: Добавить имя базы данных в meta для отслеживания
+**Важно:** 
+- Для каждой базы в multisearch используется только ОДИН k (из `k_for_search`)
+- Имя базы и используемый k добавляются в meta для трекинга
+- Sketch содержит все k для всех баз (один раз генерируется)
 
 ---
 
@@ -498,26 +131,30 @@ PARSE_SOURMASH (финальная обработка)
 ### Фаза 1: Подготовка инфраструктуры
 
 #### Задача 1.1: Конфигурация параметров
-**Файлы**: nextflow.config, modules.config, production.config
+**Файлы**: `nextflow.config`, `conf/modules.config`, `conf/production.config`
 
 **Действия**:
 - Добавить параметр `params.sourmash_databases = []`
 - Добавить параметр `params.sourmash_db_config = null`
 - Добавить параметр `params.sourmash_taxonomy_level = 'order'`
-- Добавить условный параметр `params.run_sourmash = 'off'` (поддержка значений: `off`, `genomic`, `both`)
-- Настроить `task.ext.args` для `SOURMASH_SKETCH` с динамической генерацией k и s
+- Добавить условный параметр `params.run_sourmash = 'off'` (значения: `off`, `genomic`, `both`)
+- Настроить динамическую генерацию `task.ext.args` для `SOURMASH_SKETCH`:
+  - Собрать все уникальные `k_for_search` из конфигурации баз
+  - Найти минимальное `s` из всех баз
+  - Сгенерировать: `"dna --param-string 'scaled=<min_s>,k=<k1>,k=<k2>,...,abund'"`
 
-**Тестовый конфиг**: `assets/sourmash_testing/test.config` (проверить наличие всех необходимых параметров)
+**Тестовый конфиг**: `assets/sourmash_testing/test.config` (проверить наличие всех параметров)
 
 #### Задача 1.2: Парсинг конфигурации баз данных
-**Локация**: ascc_genomic.nf (в начале workflow)
+**Локация**: `workflows/ascc_genomic.nf` (в начале workflow)
 
 **Действия**:
 - Создать логику чтения CSV файла (если указан `params.sourmash_db_config`)
 - Или использовать `params.sourmash_databases` напрямую
-- Сформировать channel: `[[name, path, k, s, assembly_taxa_db], ...]`
+- Сформировать channel: `[[name, path, k_available, k_for_search, s, assembly_taxa_db], ...]`
 - Валидация: проверить существование файлов баз данных
 - Если базы не найдены → warning + skip Sourmash
+- Собрать все уникальные `k_for_search` для передачи в sketch
 
 #### Задача 1.3: Извлечение target_taxa из taxid
 **Новый модуль**: main.nf (или функция в lib/)
@@ -543,13 +180,16 @@ PARSE_SOURMASH (финальная обработка)
 ### Фаза 2: Интеграция RUN_SOURMASH
 
 #### Задача 2.1: Подготовка входных каналов
-**Локация**: ascc_genomic.nf (в секции Sourmash)
+**Локация**: `workflows/ascc_genomic.nf` (в секции Sourmash)
 
 **Действия**:
 - Подготовить `genome_fasta` из `reference_tuple_from_GG`
 - Создать channel `ch_sourmash_databases` из распарсенной конфигурации
-- Вычислить уникальные k и min(s) для `SOURMASH_SKETCH`
+- Вычислить уникальные `k_for_search` и `min(s)` для `SOURMASH_SKETCH`
 - Получить `target_taxa` для каждого sample через новый модуль/функцию
+- Подготовить channel для multisearch:
+  - Комбинировать signature с каждой базой
+  - Добавить в meta: `db_name`, `k_for_search`, `s`
 - Подготовить `assembly_taxa_db`: если несколько уникальных путей → merge через `CAT_CAT`
 
 #### Задача 2.2: Вызов RUN_SOURMASH
@@ -570,13 +210,173 @@ if ( params.run_sourmash == "both" || params.run_sourmash == "genomic" ) {
 **Важно**: Раскомментировать outputs в main.nf
 
 #### Задача 2.3: Модификация субворкфлоу
-**Файл**: main.nf
+**Файл**: `subworkflows/local/run_sourmash/main.nf`
 
 **Изменения**:
-1. Добавить имя базы в meta при `combine` с базами данных
-2. Раскомментировать emit для `sourmash_non_target`
-3. Добавить логику проверки дубликатов в `assembly_taxa_db` (warning если есть)
-4. Добавить `.view()` для отладки на критичных этапах
+1. Обновить логику `combine`: добавить `db_name`, `k_for_search`, `s` в meta
+2. Передать `k_for_search` в `SOURMASH_MULTISEARCH` для каждой базы
+3. Раскомментировать emit для `sourmash_non_target` и `sourmash_summary`
+4. Добавить логику проверки дубликатов в `assembly_taxa_db` (warning если есть)
+5. Добавить `.view()` для отладки на критичных этапах
+
+#### Задача 2.4: Модификация модуля SOURMASH_MULTISEARCH
+**Файл**: `modules/local/sourmash/multisearch/main.nf`
+
+**Изменения**:
+- Принимать `k_for_search` как входной параметр
+- Использовать db-specific k в команде: `--ksize ${k_for_search}`
+- Добавить `db_name` в имя выходного файла для идентификации
+
+---
+
+### Фаза 2.5: Написание nf-test тестов
+
+#### Задача 2.5.1: Создание тестов для модуля SOURMASH_MULTISEARCH
+**Файл**: `modules/local/sourmash/multisearch/tests/main.nf.test`
+
+**Действия**:
+- Создать директорию `tests/` в `modules/local/sourmash/multisearch/`
+- Создать `main.nf.test` по аналогии с `modules/nf-core/sourmash/sketch/tests/main.nf.test`
+- Реализовать минимум 2 теста:
+  1. Базовый тест с реальными данными (genome + database)
+  2. Stub тест (с опцией `-stub`)
+- Использовать тестовые данные из `assets/sourmash_testing/`
+- Проверять:
+  - `process.success`
+  - Наличие выходных файлов (`multisearch_results`)
+  - Версии (`process.out.versions`)
+- Создать snapshot файл (`main.nf.test.snap`)
+
+**Теги для теста**:
+```groovy
+tag "sourmash"
+tag "sourmash/multisearch"
+tag "modules"
+tag "modules_local"
+```
+
+#### Задача 2.5.2: Создание тестов для модуля PARSE_SOURMASH
+**Файл**: `modules/local/parse/sourmash/tests/main.nf.test`
+
+**Действия**:
+- Создать директорию `tests/` в `modules/local/parse/sourmash/`
+- Создать `main.nf.test` с тестами для парсера
+- Реализовать тесты:
+  1. Базовый тест с результатами multisearch
+  2. Тест с различными target_taxa
+  3. Stub тест
+- Подготовить тестовые входные данные:
+  - Результат multisearch (CSV)
+  - `assembly_taxa_db` файл
+  - `target_taxa` значение
+- Проверять:
+  - Корректность парсинга
+  - Формат выходных файлов (`summary_csv`, `nontarget_csv`)
+  - Правильность фильтрации по target_taxa
+
+**Теги для теста**:
+```groovy
+tag "parse"
+tag "parse/sourmash"
+tag "modules"
+tag "modules_local"
+```
+
+#### Задача 2.5.3: Создание тестов для субворкфлоу RUN_SOURMASH
+**Файл**: `subworkflows/local/run_sourmash/tests/main.nf.test`
+
+**Действия**:
+- Создать директорию `tests/` в `subworkflows/local/run_sourmash/`
+- Создать `main.nf.test` по аналогии с `subworkflows/nf-core/utils_nfschema_plugin/tests/main.nf.test`
+- Использовать `nextflow_workflow` блок (не `nextflow_process`)
+- Реализовать тесты:
+  1. **Полный тест**: Геном + одна база данных + target_taxa
+  2. **Множественные базы**: Геном + 2-3 базы (разные k)
+  3. **Проверка skip**: Некорректные данные (должен skip с warning, если применимо)
+- Подготовить конфигурационный файл `tests/nextflow.config` с параметрами
+- Проверять:
+  - Успешное выполнение всего субворкфлоу
+  - Корректность выходных каналов (`sourmash_summary`, `sourmash_non_target`)
+  - Версии всех модулей
+
+**Структура теста**:
+```groovy
+nextflow_workflow {
+    name "Test Subworkflow RUN_SOURMASH"
+    script "../main.nf"
+    workflow "RUN_SOURMASH"
+    
+    tag "subworkflows"
+    tag "subworkflows_local"
+    tag "run_sourmash"
+    
+    config "./nextflow.config"
+    
+    test("Single database test") {
+        when {
+            workflow {
+                """
+                input[0] = // genome_fasta
+                input[1] = // sourmash_database
+                input[2] = // assembly_taxa_db
+                input[3] = // target_taxa
+                input[4] = // k
+                input[5] = // s
+                """
+            }
+        }
+        
+        then {
+            assertAll(
+                { assert workflow.success },
+                { assert snapshot(workflow.out).match() }
+            )
+        }
+    }
+}
+```
+
+#### Задача 2.5.4: Подготовка тестовых данных
+**Локация**: `assets/sourmash_testing/` или `tests/sourmash_testdata/`
+
+**Действия**:
+- Проверить наличие минимальных тестовых данных:
+  - Тестовый геном (маленький FASTA, ~100-500 контигов)
+  - Минимальная sourmash база данных (ZIP или RocksDB)
+  - `assembly_taxa_db.csv` файл
+  - Пример результата multisearch (для теста PARSE_SOURMASH)
+- Если данных нет - создать minimal test dataset:
+  - Взять sarscov2 genome из nf-core test-datasets
+  - Создать sketch для него
+  - Создать мини-базу из 2-3 организмов
+- Задокументировать структуру тестовых данных в `tests/README.md`
+
+#### Задача 2.5.5: Запуск и валидация тестов
+**Действия**:
+- Запустить тесты локально:
+  ```bash
+  # Тест отдельного модуля
+  nf-test test modules/local/sourmash/multisearch/tests/main.nf.test
+  nf-test test modules/local/parse/sourmash/tests/main.nf.test
+  
+  # Тест субворкфлоу
+  nf-test test subworkflows/local/run_sourmash/tests/main.nf.test
+  
+  # Все sourmash тесты
+  nf-test test --tag sourmash
+  ```
+- Проверить coverage (все основные пути выполнения покрыты)
+- Создать snapshot файлы для всех тестов
+- Убедиться что тесты проходят в CI/CD (если настроен)
+- Задокументировать процесс запуска тестов в `README.md`
+
+**Критерии успеха**:
+- ✅ Все 3 набора тестов созданы (2 модуля + 1 субворкфлоу)
+- ✅ Каждый модуль имеет минимум 2 теста (базовый + stub)
+- ✅ Субворкфлоу имеет минимум 2 сценария (single DB + multiple DBs)
+- ✅ Все тесты проходят успешно локально
+- ✅ Snapshot файлы созданы и валидны
+- ✅ Тесты следуют паттернам nf-core (структура, теги, assertions)
 
 ---
 
@@ -614,9 +414,9 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 
 ---
 
-### Фаза 4: Интеграция с Merge Tables
+### Фаза 3.5: Интеграция с Merge Tables
 
-#### Задача 4.1: Добавление в ASCC_MERGE_TABLES
+#### Задача 3.5.1: Добавление в ASCC_MERGE_TABLES
 **Файл**: ascc_genomic.nf
 
 **Действия**:
@@ -624,7 +424,7 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 - Добавить channel `ch_sourmash_nontarget` в inputs `ASCC_MERGE_TABLES`
 - Отформатировать meta: `.map { it -> [[id: it[0].id, process: "SOURMASH"], it[1]] }`
 
-#### Задача 4.2: Модификация модуля ASCC_MERGE_TABLES
+#### Задача 3.5.2: Модификация модуля ASCC_MERGE_TABLES
 **Файл**: main.nf
 
 **Действия**:
@@ -633,22 +433,22 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 
 ---
 
-### Фаза 5: Тестирование и документация
+### Фаза 4: Интеграционное тестирование и документация
 
-#### Задача 5.1: Подготовка тестового окружения
+#### Задача 4.1: Подготовка тестового окружения
 **Действия**:
 - Проверить наличие всех файлов в sourmash_testing
 - Создать `samplesheet.csv` если отсутствует
 - Создать `databases.csv` с описанием тестовых баз
 - Обновить `test.config` со всеми необходимыми параметрами
 
-#### Задача 5.2: Загрузка баз данных в облако
+#### Задача 4.2: Загрузка баз данных в облако
 **Отдельная задача** (выполняется параллельно):
 - Загрузить тестовые базы из db в облачное хранилище
 - Обновить пути в тестовом конфиге
 - Задокументировать URL для CI/CD
 
-#### Задача 5.3: Интеграционное тестирование
+#### Задача 4.3: Интеграционное тестирование полного пайплайна
 **Сценарии**:
 1. **Базовый тест**: Запуск с одной базой данных
 2. **Множественные базы**: Запуск с 2+ базами (проверка merge assembly_taxa_db)
@@ -656,7 +456,7 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 4. **Error handling**: Отсутствующая база данных (должен skip с warning)
 5. **Autofilter**: Проверка корректности фильтрации контигов
 
-#### Задача 5.4: Документация
+#### Задача 4.4: Документация
 **Файлы для обновления**:
 - README.md: Описание Sourmash модуля
 - usage.md: Параметры конфигурации баз данных
@@ -696,10 +496,13 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 1.1 (Конфиг) → 1.2 (Парсинг баз)
 1.3 (target_taxa) → 2.1 (Подготовка входов)
 2.1 → 2.2 (Запуск RUN_SOURMASH) → 2.3 (Модификация субворкфлоу)
-2.2 → 3.1, 3.2, 3.3 (Autofilter интеграция)
-2.2 → 4.1, 4.2 (Merge tables интеграция)
-Все → 5.3 (Тестирование)
-5.2 (Облако) - параллельно
+2.3 → 2.5 (Написание nf-test тестов для модулей и субворкфлоу)
+2.5.4 (Подготовка тестовых данных) - параллельно с 2.1-2.3
+2.5 → 2.5.5 (Запуск и валидация unit-тестов)
+2.3 → 3.1, 3.2, 3.3 (Autofilter интеграция)
+2.3 → 3.5.1, 3.5.2 (Merge tables интеграция)
+Все → 4.3 (Интеграционное тестирование полного пайплайна)
+4.2 (Облако) - параллельно с разработкой
 ```
 
 ---
