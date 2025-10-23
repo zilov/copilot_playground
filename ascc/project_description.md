@@ -657,3 +657,65 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 **Следующий шаг:** Задача 1.4 - Извлечение target_taxa из taxid
 
 ---
+
+### 2025-10-23 - Задача 1.4: Извлечение target_taxa из taxid ✅
+
+**Статус:** Выполнено  
+**Время:** 14:56 - 15:00 (4 минуты)  
+**Лог:** `~/github/copilot_playground/ascc/task_1.4_log_2025-10-23_15-00.md`
+
+**Созданные файлы:**
+
+1. **Python скрипт:**
+   - `/Users/dz11/github/ascc/bin/get_target_taxa_from_taxid.py` ✨ НОВЫЙ
+   - Версия: 1.0.0
+   - Функции: парсинг rankedlineage.dmp, извлечение target_taxa на заданном уровне
+   - Обработка ошибок: TAXID_NOT_FOUND, LEVEL_EMPTY маркеры + warnings
+
+2. **Nextflow модуль:**
+   - `/Users/dz11/github/ascc/modules/local/get/target_taxa/main.nf` ✨ НОВЫЙ
+   - `/Users/dz11/github/ascc/modules/local/get/target_taxa/environment.yml` ✨ НОВЫЙ
+   - Label: process_low
+   - Container: Python 3.9
+   - Включает stub для тестирования
+
+**Формат rankedlineage.dmp:**
+```
+taxid | name | species | genus | family | order | class | phylum | kingdom | domain
+```
+
+**Использование:**
+```groovy
+GET_TARGET_TAXA (
+    ch_samples_with_taxid,           // tuple val(meta), val(taxid)
+    ncbi_ranked_lineage_path,        // path
+    params.sourmash_taxonomy_level   // val (default: 'order')
+)
+```
+
+**Выход:**
+- Успешно: `level:taxa_name` (например, `order:Artiodactyla`)
+- Ошибка: `TAXID_NOT_FOUND` или `LEVEL_EMPTY`
+
+**Обработка ошибок:**
+- Taxid не найден → warning + маркер в файле
+- Уровень таксономии пустой → warning + маркер в файле
+- Процесс не прерывается (exit 0), позволяет pipeline продолжить
+- Workflow должен фильтровать failed samples перед RUN_SOURMASH
+
+**Ключевые решения:**
+- Однопроходный парсинг rankedlineage.dmp (не загружается в память полностью)
+- Graceful degradation: ошибки не прерывают pipeline
+- Маркеры ошибок позволяют workflow принять решение о skip Sourmash
+- Stub реализация для быстрого тестирования
+
+**Готовность к интеграции:**
+- ✅ Модуль готов к использованию в workflow
+- ✅ Совместим с conda и контейнерами
+- ⏭️ Требуется интеграция в ascc_genomic.nf (Фаза 2)
+- ⏭️ Написание nf-test тестов (задача 2.5)
+
+**Следующий шаг:** Фаза 2 - Интеграция RUN_SOURMASH в основной workflow
+
+---
+
