@@ -526,3 +526,23 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 4. **Optional inputs**: использовать `Channel.of([[id: "NA"], []])` для skip mode
 5. **Meta enrichment**: добавлять процесс и имя базы в meta для BTK/reporting
 6. **BTK интеграция**: отложена на будущее, пока не требуется
+---
+
+## История изменений
+
+### 2025-10-23 - Задача 1.1: Конфигурация параметров ✅
+
+**Статус:** Выполнено  
+**Лог:** `~/github/copilot_playground/ascc/log_task_1.1_config_parameters.md`
+
+**Измененные файлы:**
+- `/Users/dz11/github/ascc/nextflow.config` - добавлены параметры sourmash_databases, sourmash_db_config, sourmash_taxonomy_level
+- `/Users/dz11/github/ascc/conf/production.config` - добавлен пример конфигурации баз данных с комментариями
+- `/Users/dz11/github/ascc/conf/modules.config` - обновлены SOURMASH_SKETCH и SOURMASH_MULTISEARCH с комментариями о динамической генерации
+- `/Users/dz11/github/ascc/assets/sourmash_testing/nextflow.config` - переработана структура конфигурации на новый формат
+
+**Ключевые решения:**
+- Формат конфигурации баз: Map с полями [name, path, k_available, k_for_search, s, assembly_taxa_db]
+- Два способа конфигурации: через params.sourmash_databases или params.sourmash_db_config (CSV)
+- Динамическая генерация параметров sketch будет реализована в workflow (Задача 1.2)
+

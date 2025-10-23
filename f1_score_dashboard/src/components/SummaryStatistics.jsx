@@ -16,8 +16,8 @@ const SummaryStatistics = ({ aggregatedResults }) => {
               <th className="px-4 py-2 text-right">Recall Win Rate</th>
               <th className="px-4 py-2 text-right">Accuracy Win Rate</th>
               <th className="px-4 py-2 text-right">F1 W/L/D</th>
-              <th className="px-4 py-2 text-right">Avg Tool F1</th>
-              <th className="px-4 py-2 text-right">Avg Baseline F1</th>
+              <th className="px-4 py-2 text-right">Precision W/L/D</th>
+              <th className="px-4 py-2 text-right">Recall W/L/D</th>
             </tr>
           </thead>
           <tbody>
@@ -38,8 +38,20 @@ const SummaryStatistics = ({ aggregatedResults }) => {
                   <span className="text-gray-400 mx-1">/</span>
                   <span className="text-blue-600">{result.f1_ties || 0}</span>
                 </td>
-                <td className="px-4 py-2 text-right text-sm font-mono">{(result.avg_tool_f1 || 0).toFixed(3)}</td>
-                <td className="px-4 py-2 text-right text-sm font-mono">{(result.avg_fcs_f1 || 0).toFixed(3)}</td>
+                <td className="px-4 py-2 text-right text-sm">
+                  <span className="text-green-600">{result.precision_wins || 0}</span>
+                  <span className="text-gray-400 mx-1">/</span>
+                  <span className="text-red-600">{result.precision_losses || 0}</span>
+                  <span className="text-gray-400 mx-1">/</span>
+                  <span className="text-blue-600">{result.precision_ties || 0}</span>
+                </td>
+                <td className="px-4 py-2 text-right text-sm">
+                  <span className="text-green-600">{result.recall_wins || 0}</span>
+                  <span className="text-gray-400 mx-1">/</span>
+                  <span className="text-red-600">{result.recall_losses || 0}</span>
+                  <span className="text-gray-400 mx-1">/</span>
+                  <span className="text-blue-600">{result.recall_ties || 0}</span>
+                </td>
               </tr>
             ))}
           </tbody>
