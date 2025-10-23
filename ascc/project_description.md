@@ -98,7 +98,7 @@ params.sourmash_taxonomy_level = 'order'  // class, family, order, genus, phylum
 - База1: k_for_search=51, s=200
 - База2: k_for_search=31, s=200
 - База3: k_for_search=21, s=1000
-→ Sketch параметры: `scaled=200,k=21,k=31,k=51,abund`
+→ Sketch параметры: `scaled=200,k=21,k=31,k=51`
 
 **Важно:** Sketch создается ОДИН раз со всеми k, которые будут использоваться в multisearch
 
@@ -141,7 +141,7 @@ params.sourmash_taxonomy_level = 'order'  // class, family, order, genus, phylum
 - Настроить динамическую генерацию `task.ext.args` для `SOURMASH_SKETCH`:
   - Собрать все уникальные `k_for_search` из конфигурации баз
   - Найти минимальное `s` из всех баз
-  - Сгенерировать: `"dna --param-string 'scaled=<min_s>,k=<k1>,k=<k2>,...,abund'"`
+  - Сгенерировать: `"dna --param-string 'scaled=<min_s>,k=<k1>,k=<k2>,...'"`
 
 **Тестовый конфиг**: `assets/sourmash_testing/test.config` (проверить наличие всех параметров)
 
@@ -156,7 +156,25 @@ params.sourmash_taxonomy_level = 'order'  // class, family, order, genus, phylum
 - Если базы не найдены → warning + skip Sourmash
 - Собрать все уникальные `k_for_search` для передачи в sketch
 
-#### Задача 1.3: Извлечение target_taxa из taxid
+#### Задача 1.3: Обновление nextflow_schema.json
+**Файл**: `nextflow_schema.json`
+
+**Действия**:
+- Добавить новые параметры в соответствующую секцию схемы:
+  - `sourmash_databases` (type: array, описание структуры элементов)
+  - `sourmash_db_config` (type: string, format: file-path, pattern: CSV)
+  - `sourmash_taxonomy_level` (type: string, enum: [class, family, order, genus, phylum, species])
+- Обновить описание параметра `run_sourmash` (если требуется)
+- Добавить секцию "Sourmash Options" или включить в "Reference genome options"
+- Указать зависимости: `sourmash_databases` или `sourmash_db_config` required если `run_sourmash != 'off'`
+- Добавить help_text с примерами и ссылками на документацию
+
+**Валидация**:
+- Проверить схему на корректность JSON
+- Запустить `nf-core schema validate` (если доступно)
+- Убедиться, что nf-core lint проходит без ошибок по схеме
+
+#### Задача 1.4: Извлечение target_taxa из taxid
 **Новый модуль**: main.nf (или функция в lib/)
 
 **Вход**:
@@ -494,7 +512,8 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 
 ```
 1.1 (Конфиг) → 1.2 (Парсинг баз)
-1.3 (target_taxa) → 2.1 (Подготовка входов)
+1.1 (Конфиг) → 1.3 (Обновление nextflow_schema.json)
+1.4 (target_taxa) → 2.1 (Подготовка входов)
 2.1 → 2.2 (Запуск RUN_SOURMASH) → 2.3 (Модификация субворкфлоу)
 2.3 → 2.5 (Написание nf-test тестов для модулей и субворкфлоу)
 2.5.4 (Подготовка тестовых данных) - параллельно с 2.1-2.3
@@ -546,3 +565,51 @@ AUTOFILTER_AND_CHECK_ASSEMBLY (
 - Два способа конфигурации: через params.sourmash_databases или params.sourmash_db_config (CSV)
 - Динамическая генерация параметров sketch будет реализована в workflow (Задача 1.2)
 
+---
+
+### 2025-10-23 - Задача 1.2: Парсинг конфигурации баз данных ✅
+
+**Статус:** Выполнено  
+**Лог:** `~/github/copilot_playground/ascc/log_task_1.2_parse_databases.md`
+
+**Созданные файлы:**
+- `/Users/dz11/github/ascc/lib/SourmashDatabaseConfig.groovy` - Groovy класс для парсинга и валидации конфигурации баз данных (245 строк)
+
+**Измененные файлы:**
+- `/Users/dz11/github/ascc/workflows/ascc_genomic.nf` - интегрирован парсер конфигурации (строки 65-96, 138-162)
+
+**Реализованная функциональность:**
+
+1. **Парсинг конфигурации:**
+   - Чтение из `params.sourmash_databases` (Nextflow config)
+   - Чтение из CSV файла через `params.sourmash_db_config`
+   - Приоритет: CSV > params.sourmash_databases
+
+2. **Валидация:**
+   - Проверка существования файлов баз данных
+   - Проверка существования assembly_taxa_db файлов
+   - Проверка корректности k_for_search относительно k_available
+   - Проверка дубликатов имен баз
+   - Warning при дублирующихся assembly_taxa_db
+
+3. **Вспомогательные функции:**
+   - `collectUniqueK()` - сбор всех уникальных k_for_search для sketch
+   - `getMinimumScaled()` - нахождение минимального scaled для sketch
+   - `generateSketchParams()` - генерация строки параметров для SOURMASH_SKETCH
+   - `logDatabaseSummary()` - логирование информации о загруженных базах
+
+4. **Интеграция в workflow:**
+   - Парсинг и валидация при запуске workflow
+   - Создание канала `ch_sourmash_databases` из конфигурации
+   - Graceful skip при отсутствии или невалидных базах данных
+   - Передача канала в субворкфлоу RUN_SOURMASH
+
+**Error Handling:**
+- Отсутствие конфигурации → warning + skip
+- Невалидные файлы → error + skip
+- Некорректные параметры → warning + продолжение
+- Дубликаты assembly_taxa_db → warning (не критично)
+
+**Следующий шаг:** Задача 1.3 - Обновление nextflow_schema.json
+
+---
